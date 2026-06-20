@@ -1,0 +1,39 @@
+{
+  "platform": "AORUS MASTER 16 AM6H",
+  "relationship": {
+    "zh": "AORUS MASTER 16 AM6H 是這台旗艦 AI 電競筆電的機身模具總型號（Platform 平台型號）。BZH、BYH、BXH 則是同一台 AM6H 機身下、因為搭載不同 NVIDIA GeForce RTX 50 系列獨立顯示卡而區分出的三個具體規格型號（子系列）。三個型號除了顯示晶片（GPU、顯示記憶體、繪圖功耗）不同之外，其餘規格（處理器、螢幕、記憶體、儲存、連接埠等）完全相同。AM6H 並非固定搭載單一顯卡，購買時需在 BZH / BYH / BXH 之間擇一。",
+    "en": "AORUS MASTER 16 AM6H is the platform (chassis) model name of this flagship AI gaming laptop. BZH, BYH and BXH are three specific configuration models (sub-series) under the same AM6H platform, distinguished only by which NVIDIA GeForce RTX 50 series discrete GPU they ship with. Apart from the graphics card (GPU, video memory and graphics power), all other specifications (CPU, display, memory, storage, ports, etc.) are identical across the three. AM6H is not a single fixed GPU configuration; you choose one of BZH / BYH / BXH at purchase."
+  },
+  "variants": [
+    {
+      "code": "BZH",
+      "lines": [
+        "NVIDIA® GeForce RTX™ 5090 Laptop GPU",
+        "24GB GDDR7",
+        "175W Maximum Graphics Power with Dynamic Boost*",
+        "AI Boost : 1797 MHz (1597 MHz Boost Clock + 200 MHz OC)*",
+        "*May vary by scenario"
+      ]
+    },
+    {
+      "code": "BYH",
+      "lines": [
+        "NVIDIA® GeForce RTX™ 5080 Laptop GPU",
+        "16GB GDDR7",
+        "175W Maximum Graphics Power with Dynamic Boost*",
+        "AI Boost : 1902 MHz (1702 MHz Boost Clock + 200 MHz OC)*",
+        "*May vary by scenario"
+      ]
+    },
+    {
+      "code": "BXH",
+      "lines": [
+        "NVIDIA® GeForce RTX™ 5070 Ti Laptop GPU",
+        "12GB GDDR7",
+        "140W Maximum Graphics Power with Dynamic Boost*",
+        "AI Boost : 1962 MHz (1762 MHz Boost Clock + 200 MHz OC)*",
+        "*May vary by scenario"
+      ]
+    }
+  ]
+}

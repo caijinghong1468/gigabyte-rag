@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>筆電規格 AI 助手</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f4;
+      --panel: #ffffff;
+      --panel-soft: #f0f4ef;
+      --text: #1b211d;
+      --muted: #687068;
+      --line: #dce2da;
+      --accent: #0f766e;
+      --accent-soft: #edf7f5;
+      --gold: #b7791f;
+      --danger: #b42318;
+      --shadow: 0 18px 60px rgba(24, 31, 27, .12);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+      overflow: hidden;            /* the app fills one viewport — no page scroll */
+    }
+
+    button, textarea { font: inherit; }
+
+    .app {
+      height: 100vh;
+      height: 100dvh;              /* exact viewport on mobile (address-bar safe) */
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 18px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 4px 2px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(22px, 3vw, 34px);
+      line-height: 1.1;
+      font-weight: 760;
+    }
+
+    .subhead {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status {
+      min-width: 112px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--muted);
+      background: var(--panel);
+      text-align: center;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .status.streaming {
+      color: var(--accent);
+      border-color: rgba(15, 118, 110, .35);
+      background: var(--accent-soft);
+    }
+
+    .head-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ghost {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 14px;
+      color: var(--muted);
+      background: var(--panel);
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .ghost:hover { border-color: rgba(15, 118, 110, .45); color: var(--accent); }
+    .ghost:disabled { cursor: not-allowed; opacity: .5; }
+
+    .chat {
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-rows: 1fr auto;
+      overflow: hidden;
+    }
+
+    .messages {
+      min-height: 0;               /* let the 1fr track shrink so only this scrolls */
+      overflow-y: auto;
+      padding: 22px;
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .message.user { justify-items: end; }
+    .message.assistant { justify-items: start; }
+
+    .role {
+      color: var(--muted);
+      font-size: 12px;
+      padding: 0 4px;
+    }
+
+    .bubble {
+      max-width: min(760px, 92%);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 13px 15px;
+      background: var(--panel-soft);
+      line-height: 1.65;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .user .bubble {
+      color: #fff;
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+
+    .assistant .bubble { background: #fbfcfa; }
+
+    /* Rendered markdown inside an answer bubble. */
+    .bubble p { margin: 0 0 8px; }
+    .bubble p:last-child, .bubble ul:last-child, .bubble ol:last-child { margin-bottom: 0; }
+    .bubble ul, .bubble ol { margin: 6px 0; padding-left: 22px; }
+    .bubble li { margin: 3px 0; }
+    .bubble strong { font-weight: 700; color: var(--text); }
+    .bubble code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .92em;
+      background: var(--accent-soft);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1px 5px;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 7px;
+      height: 1.1em;
+      margin-left: 2px;
+      vertical-align: -2px;
+      background: var(--gold);
+      animation: blink 1s steps(2, start) infinite;
+    }
+
+    .message.done .cursor { display: none; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: min(760px, 92%);
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 8px;
+      color: var(--muted);
+      background: #fff;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .composer {
+      border-top: 1px solid var(--line);
+      padding: 14px;
+      background: #fbfcfa;
+    }
+
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .suggestions button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 11px;
+      color: var(--text);
+      background: #fff;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .suggestions button:hover {
+      border-color: rgba(15, 118, 110, .45);
+      color: var(--accent);
+    }
+
+    form {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: end;
+      gap: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 48px;
+      max-height: 150px;
+      resize: none;                /* fixed height keeps the layout to one screen */
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 13px;
+      color: var(--text);
+      background: #fff;
+      outline: none;
+      line-height: 1.45;
+    }
+
+    textarea:focus {
+      border-color: rgba(15, 118, 110, .65);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, .12);
+    }
+
+    .primary, .secondary {
+      min-height: 48px;
+      border-radius: 8px;
+      padding: 0 16px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .primary { color: #fff; background: var(--accent); }
+    .primary:disabled { cursor: not-allowed; opacity: .55; }
+
+    .secondary {
+      color: var(--danger);
+      border-color: rgba(180, 35, 24, .25);
+      background: #fff;
+    }
+
+    .secondary[hidden] { display: none; }
+    .error { color: var(--danger); }
+
+    @media (max-width: 720px) {
+      .app { padding: 12px; }
+      header { align-items: flex-start; flex-direction: column; }
+      .status { text-align: left; }
+      .messages { padding: 16px; }
+      .bubble, .meta { max-width: 100%; }
+      form { grid-template-columns: 1fr; }
+      .primary, .secondary { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>筆電規格 AI 助手</h1>
+        <div class="subhead">AORUS MASTER 16 AM6H 問答</div>
+      </div>
+      <div class="head-actions">
+        <button id="reset" class="ghost" type="button" title="開始全新對話（清除目前對話，從頭開始）"><span aria-hidden="true">＋</span> 新對話</button>
+        <div id="status" class="status">待命</div>
+      </div>
+    </header>
+
+    <section class="chat" aria-label="聊天">
+      <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+
+      <div class="composer">
+        <div class="suggestions" aria-label="範例問題">
+          <button type="button" data-prompt="AORUS MASTER 16 BZH 和 BYH 的顯卡差在哪？">BZH / BYH 顯卡差異</button>
+          <button type="button" data-prompt="我適合哪台筆電？">我適合哪台筆電？</button>
+          <button type="button" data-prompt="AORUS MASTER 16顯卡規格如何？">顯卡規格</button>
+        </div>
+        <form id="form">
+          <textarea id="question" rows="2" placeholder="輸入你的筆電規格問題…（Enter 送出，Shift + Enter 換行）" autocomplete="off"></textarea>
+          <button id="send" class="primary" type="submit">送出</button>
+          <button id="stop" class="secondary" type="button" hidden>停止</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const form = document.querySelector("#form");
+    const input = document.querySelector("#question");
+    const sendButton = document.querySelector("#send");
+    const stopButton = document.querySelector("#stop");
+    const resetButton = document.querySelector("#reset");
+    const messages = document.querySelector("#messages");
+    const status = document.querySelector("#status");
+    const suggestions = document.querySelectorAll("[data-prompt]");
+
+    // The server keeps each session's history and the model uses it for
+    // multi-turn memory. "新對話" starts a brand-new session id (a clean slate),
+    // so it is mutable rather than a const.
+    function newSessionId() {
+      return (crypto.randomUUID && crypto.randomUUID()) ||
+        `s-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+    let sessionId = newSessionId();
+
+    // Default opening message shown before the user asks anything.
+    const GREETING =
+      "你好！我是 AORUS MASTER 16 AM6H 筆電規格小幫手\n" +
+      "你可以用繁體中文或英文，問我 BZH、BYH、BXH 三種筆電型號的顯卡版本、處理器、螢幕、" +
+      "記憶體、儲存與連接埠等規格問題，我會盡我所能回答。可以試試下面的範例，或直接輸入問題。";
+
+    let currentSource = null;
+    let currentAssistant = null;
+    let currentMeta = null;
+    let finished = false;
+
+    // Render the greeting as the first assistant bubble (no cursor, no metrics).
+    function showGreeting() {
+      const message = appendMessage("assistant", GREETING);
+      message.classList.add("done");
+    }
+
+    suggestions.forEach((button) => {
+      button.addEventListener("click", () => {
+        if (currentSource) return;          // ignore while a stream is in flight
+        input.value = button.dataset.prompt;
+        form.requestSubmit();               // fill AND send in one tap
+      });
+    });
+
+    // Enter sends; Shift+Enter inserts a newline. Skip while an IME candidate is
+    // still being composed (Enter there only commits the候選字, it must not send).
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey) return;
+      if (event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      form.requestSubmit();
+    });
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const question = input.value.trim();
+      if (!question || currentSource) return;
+
+      appendMessage("user", question);
+      input.value = "";
+      startStream(question);
+    });
+
+    showGreeting();
+
+    stopButton.addEventListener("click", () => {
+      if (!currentSource) return;
+      finished = true;
+      currentSource.close();
+      if (currentAssistant) currentAssistant.classList.add("done");
+      if (currentMeta) currentMeta.appendChild(pill("已停止"));
+      resetBusy("已停止");
+    });
+
+    // New conversation: stop any in-flight answer, open a brand-new session
+    // (so the model starts with a clean slate), wipe the transcript, and free
+    // the old session's history on the server.
+    resetButton.addEventListener("click", () => {
+      if (currentSource) {                        // abort a streaming answer
+        finished = true;
+        currentSource.close();
+        resetBusy("待命");
+      }
+      const oldId = sessionId;
+      sessionId = newSessionId();                 // a genuinely fresh conversation
+      // Fire-and-forget: release the old session's memory on the server.
+      fetch(`/session/${encodeURIComponent(oldId)}/reset`, { method: "POST" }).catch(() => {});
+      messages.replaceChildren();
+      showGreeting();
+      input.value = "";
+      status.textContent = "待命";
+      input.focus();
+    });
+
+    function startStream(question) {
+      const assistant = appendMessage("assistant", "");
+      const textNode = assistant.querySelector("[data-text]");
+      currentAssistant = assistant;
+      currentMeta = assistant.querySelector("[data-meta]");
+      finished = false;
+      setBusy("串流中");
+
+      // No top_k here on purpose — let the server use its configured default
+      // (cfg.top_k=7; the BZH/BYH/BXH model codes need those extra slots).
+      // session_id ties this turn to the conversation's stored history.
+      const url = `/chat?question=${encodeURIComponent(question)}` +
+        `&session_id=${encodeURIComponent(sessionId)}`;
+      const source = new EventSource(url);
+      currentSource = source;
+
+      source.onmessage = (event) => {
+        let payload;
+        try {
+          payload = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+
+        if (payload.token != null) {
+          // Stream as plain text (markdown shows raw); we format once at the end.
+          textNode.textContent += payload.token;
+          scrollToBottom();
+        }
+
+        if (payload.done) {
+          finished = true;
+          source.close();
+          assistant.classList.add("done");
+          // Now render the complete answer as lightweight markdown.
+          textNode.innerHTML = renderMarkdown(payload.answer || textNode.textContent);
+          renderMeta(currentMeta, payload);
+          resetBusy("完成");
+          scrollToBottom();
+        }
+      };
+
+      source.onerror = () => {
+        source.close();
+        if (!finished) {
+          assistant.classList.add("done");
+          textNode.classList.add("error");
+          if (!textNode.textContent.trim()) textNode.textContent = "連線中斷，請稍後再試。";
+          if (currentMeta) currentMeta.appendChild(pill("串流失敗"));
+          resetBusy("發生錯誤");
+        }
+      };
+    }
+
+    function appendMessage(role, content) {
+      const message = document.createElement("article");
+      message.className = `message ${role}`;
+
+      const roleLabel = document.createElement("div");
+      roleLabel.className = "role";
+      roleLabel.textContent = role === "user" ? "你" : "AI 助手";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+
+      const text = document.createElement("span");
+      text.dataset.text = "";
+      text.textContent = content;
+      bubble.appendChild(text);
+
+      if (role === "assistant") {
+        const cursor = document.createElement("span");
+        cursor.className = "cursor";
+        cursor.setAttribute("aria-hidden", "true");
+        bubble.appendChild(cursor);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.dataset.meta = "";
+
+      message.append(roleLabel, bubble);
+      if (role === "assistant") message.appendChild(meta);
+      messages.appendChild(message);
+      scrollToBottom();
+      return message;
+    }
+
+    function renderMeta(container, payload) {
+      container.replaceChildren();
+      const metrics = payload.metrics || {};
+      if (metrics.ttft_s !== undefined) container.appendChild(pill(`TTFT ${metrics.ttft_s}s`));
+      if (metrics.tps !== undefined) container.appendChild(pill(`${metrics.tps} tok/s`));
+      if (metrics.completion_tokens !== undefined) container.appendChild(pill(`${metrics.completion_tokens} tokens`));
+      if (payload.retrieval_s !== undefined) container.appendChild(pill(`檢索 ${payload.retrieval_s}s`));
+
+      const sources = (payload.sources || [])
+        .map((source) => source.category)
+        .filter((value, index, list) => value && list.indexOf(value) === index)
+        .slice(0, 4);
+      sources.forEach((source) => container.appendChild(pill(source)));
+    }
+
+    function pill(text) {
+      const node = document.createElement("span");
+      node.className = "pill";
+      node.textContent = text;
+      return node;
+    }
+
+    // --- minimal, safe markdown ------------------------------------------------
+    // The model answers with **bold**, `code`, and "-"/"*"/"1." lists. We escape
+    // first (so model text can never inject HTML), then introduce only a small,
+    // fixed set of safe tags. No external library needed.
+    function escapeHtml(s) {
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function inlineMd(s) {
+      return s
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/`([^`]+)`/g, "<code>$1</code>");
+    }
+
+    function renderMarkdown(raw) {
+      const lines = escapeHtml((raw || "").trim()).split("\n");
+      const out = [];
+      let list = null;                          // "ul" | "ol" | null
+      const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+
+      for (const line of lines) {
+        const trimmed = line.trimEnd();
+        const ul = trimmed.match(/^\s*[-*•]\s+(.*)$/);
+        const ol = trimmed.match(/^\s*(\d+)[.)]\s+(.*)$/);
+        if (ul) {
+          if (list !== "ul") { closeList(); out.push("<ul>"); list = "ul"; }
+          out.push(`<li>${inlineMd(ul[1])}</li>`);
+        } else if (ol) {
+          if (list !== "ol") { closeList(); out.push("<ol>"); list = "ol"; }
+          // value="N" keeps numbering correct even if bullets interrupt a list.
+          out.push(`<li value="${ol[1]}">${inlineMd(ol[2])}</li>`);
+        } else if (!trimmed.trim()) {
+          closeList();                          // blank line ends the current list
+        } else {
+          closeList();
+          out.push(`<p>${inlineMd(trimmed)}</p>`);
+        }
+      }
+      closeList();
+      return out.join("");
+    }
+
+    function setBusy(label) {
+      status.textContent = label;
+      status.classList.add("streaming");
+      sendButton.disabled = true;       // block re-send; let the user keep typing
+      stopButton.hidden = false;
+    }
+
+    function resetBusy(label) {
+      status.textContent = label;
+      status.classList.remove("streaming");
+      sendButton.disabled = false;
+      stopButton.hidden = true;
+      currentSource = null;
+      currentAssistant = null;
+      currentMeta = null;
+      input.focus();
+    }
+
+    function scrollToBottom() {
+      requestAnimationFrame(() => {
+        messages.scrollTop = messages.scrollHeight;
+      });
+    }
+  </script>
+</body>
+</html>

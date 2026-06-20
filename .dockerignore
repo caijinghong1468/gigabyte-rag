@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+**/__pycache__
+**/*.pyc
+**/*.gguf
+models/
+data/index/
+data/processed/
+eval/results/
+notebooks/
+.hf/
+.pytest_cache/
+web.html
+README.md.bak

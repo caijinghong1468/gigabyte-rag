@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- gigabyte-rag project ---
+# Large model weights (download via scripts/download_model.py)
+models/*.gguf
+*.gguf
+# Generated artifacts (rebuild via scripts/01_scrape.py + 02_build_index.py)
+data/processed/
+data/index/
+# HF cache + duplicate root HTML (canonical copy lives in data/raw/)
+.hf/
+/web.html
+# Keep the saved spec page and eval set tracked:
+!data/raw/am6h_spec.html

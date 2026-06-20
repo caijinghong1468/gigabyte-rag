@@ -1,0 +1,91 @@
+# GPU services for the AORUS MASTER 16 AM6H RAG. Requires the NVIDIA Container
+# Toolkit on the host. One image, two model stacks (Qwen3-1.7B / Llama-3.2-3B);
+# only ONE runs at a time (single GPU, ~4GB VRAM). models/ and data/ are
+# bind-mounted so downloaded GGUFs and the (shared) index persist between runs.
+#
+# Pick a model in either of two ways:
+#   A) edit MODEL in .env, then:   docker compose up -d --build rag
+#   B) name the pinned service:    docker compose up -d --build rag-llama
+#
+# Run the eval against whichever service is up, e.g.:
+#   docker compose exec rag-llama uv run --no-sync python eval/run_eval.py
+# -> writes eval/results/<model>/benchmark.md
+
+x-rag-env: &rag-env
+  N_GPU_LAYERS: "-1"
+  # MAIN_GPU / CUDA_VISIBLE_DEVICES are IN-CONTAINER indices. Since only one GPU
+  # is exposed (see device_ids below), it is always 0 here — the physical GPU is
+  # chosen by device_ids, not by these.
+  MAIN_GPU: "0"
+  CUDA_VISIBLE_DEVICES: "0"
+  # Shared embedder (models/embedding/) — identical retrieval for every model.
+  EMBED_REPO: "Qwen/Qwen3-Embedding-0.6B-GGUF"
+  EMBED_FILE: "Qwen3-Embedding-0.6B-Q8_0.gguf"
+  ENABLE_THINKING: "false"
+  # 8192 (both models support it natively, no rope scaling) gives the multi-turn
+  # memory window real room: at N_CTX=4096 with MAX_TOKENS=1024, two long answers
+  # already exhaust the history budget. Costs ~+0.4-0.5 GB VRAM/model — re-check
+  # with scripts/vram_report.py that Llama still fits the 4GB target.
+  N_CTX: "8192"
+  # top_k=7 (not 5): the BZH/BYH/BXH model codes are high-IDF tokens that live in
+  # 5 variant chunks, so a code in the question can crowd the real spec category
+  # out of the top 5. Two extra slots let it back in.
+  TOP_K: "7"
+  # Hugging Face token for gated repos (put it in .env; blank is fine otherwise).
+  HF_TOKEN: "${HF_TOKEN:-}"
+
+x-rag-base: &rag-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: am6h-rag:cuda
+  ports:
+    - "8000:8000"
+  volumes:
+    - ./models:/app/models
+    - ./data:/app/data
+    # Bind-mount the source so Python edits apply without an image rebuild
+    # (an exec'd script reads the host file fresh; restart the service to pick
+    # up changes in the long-running server). The image still bakes these via
+    # COPY, so a plain `docker run` without compose remains self-contained.
+    - ./src:/app/src
+    - ./scripts:/app/scripts
+    - ./eval:/app/eval                   # questions + run_eval + results (host)
+    - ./app:/app/app
+    - hf-cache:/app/.hf
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            device_ids: ["1"]   # pin to PHYSICAL GPU 1 (GPU 0 is busy)
+            capabilities: [gpu]
+  restart: unless-stopped
+
+services:
+  # Default service: MODEL comes from .env (defaults to qwen). The simple path —
+  # `docker compose up -d rag` after setting MODEL in .env.
+  rag:
+    <<: *rag-base
+    environment:
+      <<: *rag-env
+      MODEL: "${MODEL:-qwen}"
+
+  # Pinned services (profile "pin"): start one explicitly by name without
+  # touching .env, e.g. `docker compose up -d rag-llama`.
+  rag-qwen:
+    <<: *rag-base
+    environment:
+      <<: *rag-env
+      MODEL: "qwen"
+    profiles: ["pin"]
+
+  rag-llama:
+    <<: *rag-base
+    environment:
+      <<: *rag-env
+      MODEL: "llama"
+    profiles: ["pin"]
+
+volumes:
+  hf-cache:

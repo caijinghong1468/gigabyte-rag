@@ -1,5 +1,7 @@
 # AORUS MASTER 16 AM6H — 規格問答 RAG
-![聊天網頁畫面](web.png)
+
+![聊天網頁畫面](./img/web.png)
+
 ## 1. 簡介
 
 這是一個RAG問答系統，回答 **GIGABYTE AORUS MASTER 16 AM6H** 系列筆電的產品規格。支援**繁中／英文**混合提問、**串流輸出**、**多輪對話記憶**，並附一個單頁聊天網頁。設計目標是在 **≤4GB VRAM** 的環境穩定運作。
@@ -49,7 +51,7 @@ curl -N "http://localhost:8000/chat?question=Which GPU does it use?"
 以Qwen3-1.7B為例
 ```bash
 docker compose exec rag uv run --no-sync python eval/run_eval.py           # 輸出→ eval/results/<model>/benchmark.md
-docker compose exec rag uv run --no-sync python scripts/vram_report.py     # 輸出→ eval/results/uesd_vram.json
+docker compose exec rag uv run --no-sync python scripts/vram_report.py     # 輸出→ eval/results/used_vram.json
 ```
 
 
@@ -110,7 +112,7 @@ gigabyte-rag/
 ├── data/raw/am6h_spec.html      # 規格頁原始 HTML（唯一資料來源）+ variants.json（BZH/BYH/BXH）
 ├── data/processed/spec.jsonl    # 解析後的 K-V（產生物）
 ├── data/index/                  # embeddings.npy + chunks.jsonl（共用索引，產生物）
-├── models/{qwen，llama，embedding}/*.gguf   # 權重（gitignore，啟動時自動下載）
+├── models/{qwen,llama,embedding}/*.gguf   # 權重       （gitignore，啟動時自動下載）
 ├── src/rag/
 │   ├── config.py     # 所有設定，環境變數可覆寫
 │   ├── scrape.py     # 解析 spec-item-list → 結構化 K-V
@@ -153,16 +155,16 @@ gigabyte-rag/
 
 ---
 
-## 5. 實驗結果與模型選擇理由
+## 5. 實驗結果
 
-Evalution set: 我在`eval/questions.jsonl` 共設計 **26 題**(25 題可答的規格題 + 1 題刻意問規格外的問題，測拒答能力)，涵蓋繁中/英文、單一規格、跨型號比較與拒答。指標分量化(TTFT/TPS)與定性(檢索命中、答案正確、拒答、語言一致)。
+Evaluation set: 我在`eval/questions.jsonl` 共設計 **26 題**(25 題可答的規格題 + 1 題刻意問規格外的問題，測拒答能力)，涵蓋繁中/英文、單一規格、跨型號比較與拒答。指標分量化(TTFT/TPS)與定性(檢索命中、答案正確、拒答、語言一致)。
 
-![評分表](benchmark.png)
+![評分表](./img/benchmark.png)
 
-**評測結果分析**:在檢索Hit@7方面，兩個Model命中都只漏掉一題。在答案品質方面，也是打平(各21/25);逐題檢視顯示兩者各有一處硬傷(Qwen 否認 q18 BZH 的 HDR 支援;Llama 在 q09 幻覺出「128GB」記憶體)，其餘都是對稱的細微小遺漏。最重要的一點是，在效能與資源方面，**Qwen 明顯較優**:TTFT 快約 28%、TPS 高約 21%、VRAM 少 0.8GB，因此通過評測後我最終選擇使用參數量較小的Qwen，因為能力上跟Llama-3.2-3B相近，但在速度方面，能夠有20~30%的效能提升，以及節省0.8GB的Vram，因此預設Model設定為Qwen。
+**評測結果分析**:在檢索Hit@7方面，兩個Model命中都只漏掉一題。在答案品質方面，也是打平(各21/25);逐題檢視顯示兩者各有一處硬傷(Qwen 否認 q18 BZH 的 HDR 支援;Llama 在 q09 幻覺出「128GB」記憶體)。最重要的一點是，在效能與資源方面，**Qwen 明顯較優**:TTFT 快約 28%、TPS 高約 21%、VRAM 少 0.8GB，因此通過評測後我最終選擇使用參數量較小的Qwen，因為能力上跟Llama-3.2-3B相近，但在速度方面，能夠有20~30%的效能提升，以及節省0.8GB的Vram，因此預設Model設定為Qwen。
 
 
-## 6. 結論
+## 6. 結論與模型選擇理由
 
 首先這個專案在 ≤4GB VRAM 的限制下，並且要同時支援中文與英文，我第一時間就想到qwen的小模型，因為Qwen中文語料可能訓練較多，第二個順位就是Llama，因為Llama在對話方面能力有不錯的成績，因此此專案採用兩者的SLM來互相對比，並採用性能較好的那顆模型作為預設模型。  
 再來，考量規格屬於結構化資料，因此採用「整類＋逐行」多粒度切塊搭配 dense＋BM25＋RRF 混合檢索，讓型號、240Hz、Thunderbolt 5 這類必須精確命中的內容也能可靠撈回命中；再透過 llama.cpp 把 LLM 放 GPU、嵌入模型跑 CPU，配合嚴格的系統提示與關閉 thinking，在低資源下同時兼顧速度與正確性，規格外的問題也會誠實拒答。  
